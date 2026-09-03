@@ -48,28 +48,35 @@ class RecipeViewSet(viewsets.ModelViewSet):
     @staticmethod
     def favorite_shopping(request, pk, model, errors):
         if request.method == 'POST':
+            if not Recipe.objects.filter(id=pk).exists():
+                return Response(
+                    {'errors': 'Такого рецепта не существует'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             if model.objects.filter(user=request.user, recipe__id=pk).exists():
                 return Response(
                     {'errors': errors['recipe_in']},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            recipe = get_object_or_404(Recipe, id=pk)
+            recipe = Recipe.objects.get(id=pk)
             model.objects.create(user=request.user, recipe=recipe)
             serializer = SubscribeRecipeSerializer(
                 recipe, context={'request': request}
             )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-        recipe = model.objects.filter(user=request.user, recipe__id=pk)
-        if recipe.exists():
-            recipe.delete()
+        if not Recipe.objects.filter(id=pk).exists():
             return Response(
-                {'msg': 'Успешно удалено'},
-                status=status.HTTP_204_NO_CONTENT
+                {'errors': 'Такого рецепта не существует'},
+                status=status.HTTP_404_NOT_FOUND
             )
-        return Response(
-            {'error': errors['recipe_not_in']},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        recipe = model.objects.filter(user=request.user, recipe__id=pk)
+        if not recipe.exists():
+            return Response(
+                {'errors': errors['recipe_not_in']},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        recipe.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(
         methods=['post', 'delete'],
@@ -90,7 +97,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def shopping_cart(self, request, pk):
         return self.favorite_shopping(request, pk, ShoppingCart, {
             'recipe_in': 'Рецепт уже в списке покупок',
-            'recipe_not_in': 'Рецепта нет в спике покупок'
+            'recipe_not_in': 'Рецепта нет в списке покупок'
         })
 
     @action(
@@ -117,6 +124,20 @@ class RecipeViewSet(viewsets.ModelViewSet):
             content += 'Список покупок пуст'
         return HttpResponse(
             content,
-            content_type='text/plai', charset='utf8',
-            headers={'Content-Disposition': 'attachment; filename=shopping_list.txt'},
+            content_type='text/plain', charset='utf8',
+            headers={
+                'Content-Disposition':
+                    'attachment; filename=shopping_list.txt'
+            },
         )
+
+    @action(
+        methods=['get'],
+        detail=True,
+        permission_classes=[AllowAny],
+        url_path='get-link',
+    )
+    def get_link(self, request, pk):
+        recipe = get_object_or_404(Recipe, id=pk)
+        short_link = request.build_absolute_uri(f'/recipes/{recipe.pk}/')
+        return Response({'short-link': short_link})

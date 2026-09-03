@@ -19,13 +19,14 @@ class IngredientSerializer(serializers.ModelSerializer):
 
 class TagSerializer(serializers.ModelSerializer):
     class Meta:
-        fields = ('id', 'name', 'color', 'slug')
+        fields = ('id', 'name', 'slug')
         model = Tag
-        read_only_fields = ('id', 'name', 'color', 'slug')
+        read_only_fields = ('id', 'name', 'slug')
 
 
 class AuthorSerializer(serializers.ModelSerializer):
     is_subscribed = serializers.SerializerMethodField()
+    avatar = serializers.ImageField(read_only=True)
 
     def get_is_subscribed(self, obj):
         request = self.context.get('request')
@@ -38,7 +39,7 @@ class AuthorSerializer(serializers.ModelSerializer):
         model = User
         fields = (
             'email', 'id', 'username', 'first_name', 'last_name',
-            'is_subscribed'
+            'is_subscribed', 'avatar'
         )
 
 
@@ -179,7 +180,19 @@ class RecipeSerializer(serializers.ModelSerializer):
         return instance
 
     def validate(self, data):
+        required = ('ingredients', 'tags', 'image', 'name', 'text',
+                    'cooking_time')
+        if self.instance is not None:
+            missing = [f for f in required if f not in self.initial_data]
+            if missing:
+                raise serializers.ValidationError(
+                    {f: 'Обязательное поле.' for f in missing}
+                )
         ingredient_data = self.initial_data.get('ingredients')
+        if ingredient_data is not None and not ingredient_data:
+            raise serializers.ValidationError(
+                {'ingredients': 'Нужен хотя бы один ингредиент.'}
+            )
         if ingredient_data:
             checked_ingredients = set()
             for ingredient in ingredient_data:
@@ -189,6 +202,13 @@ class RecipeSerializer(serializers.ModelSerializer):
                 if ingredient_obj in checked_ingredients:
                     raise serializers.ValidationError('дубликат ингредиента')
                 checked_ingredients.add(ingredient_obj)
+        tags_data = self.initial_data.get('tags')
+        if tags_data is not None and not tags_data:
+            raise serializers.ValidationError(
+                {'tags': 'Нужен хотя бы один тег.'}
+            )
+        if tags_data and len(tags_data) != len(set(tags_data)):
+            raise serializers.ValidationError('дубликат тега')
         return data
 
     class Meta:

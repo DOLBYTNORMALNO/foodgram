@@ -1,6 +1,5 @@
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.validators import UnicodeUsernameValidator
-from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -27,16 +26,13 @@ class User(AbstractUser):
     )
     first_name = models.CharField(verbose_name='имя', max_length=150)
     last_name = models.CharField(verbose_name='фамилия', max_length=150)
+    avatar = models.ImageField(
+        'Аватар', upload_to='users/avatars/', null=True, blank=True
+    )
     is_superuser = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     REQUIRED_FIELDS = ['username', 'first_name', 'last_name']
     USERNAME_FIELD = 'email'
-
-    def save(self, *args, **kwargs):
-        if self.username == 'me':
-            return ValidationError('Username не может быть "me".')
-        else:
-            super().save(*args, **kwargs)
 
     @property
     def is_admin(self):

@@ -1,6 +1,6 @@
 from django.urls import include, path
 
-from .views import SubscriptionsView, SubcribeView
+from .views import AvatarView, SubscriptionsView, SubcribeView
 
 app_name = 'users'
 
@@ -12,6 +12,7 @@ urlpatterns = [
     path(
         'users/<int:pk>/subscribe/', SubcribeView.as_view(), name='subscribe'
     ),
+    path('users/me/avatar/', AvatarView.as_view(), name='avatar'),
     path('', include('djoser.urls')),
     path('auth/', include('djoser.urls.authtoken'))
 ]

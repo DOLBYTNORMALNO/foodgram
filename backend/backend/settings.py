@@ -13,6 +13,10 @@ https://docs.djangoproject.com/en/3.2/ref/settings/
 from pathlib import Path
 import os
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,12 +26,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-3k0e*s_60fba6x!70_0k#7q&rk64(s8y!vkeq)b^wz8r(v7j_^'
+SECRET_KEY = os.getenv(
+    'SECRET_KEY',
+    'django-insecure-3k0e*s_60fba6x!70_0k#7q&rk64(s8y!vkeq)b^wz8r(v7j_^'
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
+ALLOWED_HOSTS = os.getenv(
+    'ALLOWED_HOSTS', '127.0.0.1,localhost'
+).split(',')
 
 
 # Application definition
@@ -49,6 +58,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -83,8 +93,12 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.sqlite3'),
+        'NAME': os.getenv('POSTGRES_DB', BASE_DIR / 'db.sqlite3'),
+        'USER': os.getenv('POSTGRES_USER', 'postgres'),
+        'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'postgres'),
+        'HOST': os.getenv('DB_HOST', ''),
+        'PORT': os.getenv('DB_PORT', '5432'),
     }
 }
 
@@ -129,8 +143,11 @@ STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
 
-MEDIA_URL = 'media/'
+MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Письма (например, сброс пароля) выводятся в консоль контейнера
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/3.2/ref/settings/#default-auto-field
@@ -144,7 +161,7 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
+        'backend.authentication.NoFailTokenAuthentication',
     ],
     'DEFAULT_PAGINATION_CLASS':
         'recipes.paginations.CustomPageNumberPagination',
@@ -153,14 +170,20 @@ REST_FRAMEWORK = {
 
 DJOSER = {
     'HIDE_USERS': False,
+    'PASSWORD_RESET_CONFIRM_URL': (
+        'http://localhost/reset-password/?uid={uid}&token={token}'
+    ),
+    'USERNAME_RESET_CONFIRM_URL': (
+        'http://localhost/reset-password/?uid={uid}&token={token}'
+    ),
     'PERMISSIONS': {
         'user_list': ['rest_framework.permissions.AllowAny'],
-        'user': ['rest_framework.permissions.IsAuthenticated'],
+        'user': ['users.permissions.RetrieveOrAuthenticated'],
     },
     'SERIALIZERS': {
-        'current_user': 'users.serializers.UserSerializer',
+        'current_user': 'users.serializers.UserProfileSerializer',
         'user_create': 'users.serializers.UserSerializer',
-        'user': 'users.serializers.UserSerializer',
-        'user_list': 'users.serializers.UserSerializer'
+        'user': 'users.serializers.UserProfileSerializer',
+        'user_list': 'users.serializers.UserProfileSerializer'
     }
 }

@@ -1,7 +1,7 @@
 from django_filters import rest_framework as rest_framework_filter
 from rest_framework.filters import SearchFilter
 
-from .models import Recipe
+from .models import Recipe, Tag
 from .models import User
 
 
@@ -9,8 +9,10 @@ class RecipeFilter(rest_framework_filter.FilterSet):
     author = rest_framework_filter.ModelChoiceFilter(
         queryset=User.objects.all()
     )
-    tags = rest_framework_filter.AllValuesMultipleFilter(
-        field_name='tags__slug'
+    tags = rest_framework_filter.ModelMultipleChoiceFilter(
+        field_name='tags__slug',
+        to_field_name='slug',
+        queryset=Tag.objects.all(),
     )
     is_favorited = rest_framework_filter.BooleanFilter(
         method='is_favorited_filter'

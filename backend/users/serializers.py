@@ -1,5 +1,6 @@
 import django.contrib.auth.password_validation as validators
 from django.core import exceptions
+from drf_base64.fields import Base64ImageField
 from rest_framework import serializers
 from rest_framework.generics import get_object_or_404
 
@@ -9,6 +10,7 @@ from .models import User, Follow
 
 class FollowSerializer(serializers.ModelSerializer):
     is_subscribed = serializers.SerializerMethodField()
+    avatar = serializers.ImageField(read_only=True)
     recipes = serializers.SerializerMethodField()
     recipes_count = serializers.IntegerField(
         source='recipes.count', read_only=True
@@ -23,11 +25,15 @@ class FollowSerializer(serializers.ModelSerializer):
 
     def get_recipes(self, obj):
         request = self.context['request']
-        limit = request.GET.get('recipes_limit')
         author = get_object_or_404(User, id=obj.pk)
         recipes = author.recipes.all()
-        if limit:
-            recipes = recipes[:int(limit)]
+        limit = request.GET.get('recipes_limit')
+        try:
+            recipes = recipes[:int(limit)] if limit else recipes
+        except (TypeError, ValueError):
+            raise serializers.ValidationError(
+                {'recipes_limit': 'Должен быть целым числом'}
+            )
         serializer = SubscribeRecipeSerializer(
             recipes,
             many=True,
@@ -44,6 +50,7 @@ class FollowSerializer(serializers.ModelSerializer):
             'first_name',
             'last_name',
             'is_subscribed',
+            'avatar',
             'recipes',
             'recipes_count'
         )
@@ -77,3 +84,36 @@ class UserSerializer(serializers.ModelSerializer):
             'password',
         )
         extra_kwargs = {'password': {'write_only': True}}
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    is_subscribed = serializers.SerializerMethodField()
+    avatar = serializers.ImageField(read_only=True)
+
+    def get_is_subscribed(self, obj):
+        request = self.context.get('request')
+        if request.user.is_anonymous:
+            return False
+        return Follow.objects.filter(
+            user=request.user, author=obj.pk
+        ).exists()
+
+    class Meta:
+        model = User
+        fields = (
+            'email',
+            'id',
+            'username',
+            'first_name',
+            'last_name',
+            'is_subscribed',
+            'avatar',
+        )
+
+
+class SetAvatarSerializer(serializers.ModelSerializer):
+    avatar = Base64ImageField(required=True, allow_null=True)
+
+    class Meta:
+        model = User
+        fields = ('avatar',)
